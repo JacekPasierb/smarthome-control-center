@@ -36,10 +36,13 @@ export default function App() {
   useEffect(() => {
     load();
     const socket = io("http://localhost:4000");
+
+    socket.emit("subscribe", "dev-1");
     socket.on("device-update", (updatedDevice) => {
       setDevices((prev) => prev.map((d) => d.id === updatedDevice.id ? updatedDevice : d));
     });
     return () => {
+      socket.emit("unsubscribe", "dev-1");
       socket.disconnect();
     };
   }, []);

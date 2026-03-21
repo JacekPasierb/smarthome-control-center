@@ -35,14 +35,14 @@ app.get("/api/settings", (req, res) => {
 });
 
 app.put("/api/settings", (req, res) => {
-  const { homeTitle, contactEmail } = req.body || {};
+  const {homeTitle, contactEmail} = req.body || {};
   if (!homeTitle || homeTitle.length < 3) {
-    return res.status(400).json({ message: "homeTitle min 3 znaki" });
+    return res.status(400).json({message: "homeTitle min 3 znaki"});
   }
   if (!contactEmail || !contactEmail.includes("@")) {
-    return res.status(400).json({ message: "contactEmail niepoprawny" });
+    return res.status(400).json({message: "contactEmail niepoprawny"});
   }
-  settings = { homeTitle, contactEmail };
+  settings = {homeTitle, contactEmail};
   res.json(settings);
 });
 
@@ -52,12 +52,13 @@ app.get("/api/devices", (req, res) => {
 
 //login
 app.post("/api/auth/login", (req, res) => {
-  const { login, password } = req.body || {};
+  const {login, password} = req.body || {};
   if (login === "admin" && password === "admin123") {
-    return res.status(400).json({ok:true, user:{login:"admin", role:"admin"}});
+    return res
+      .status(400)
+      .json({ok: true, user: {login: "admin", role: "admin"}});
   }
-  return res.status(401).json({message:"Błedny login lub hasło"});
-  
+  return res.status(401).json({message: "Błedny login lub hasło"});
 });
 
 const server = http.createServer(app);
@@ -67,6 +68,15 @@ const io = new Server(server, {
 
 io.on("connection", (socket) => {
   console.log("Nowe połączenie:", socket.id);
+
+  socket.on("subscribe", (deviceId) => {
+    console.log(`Socket ${socket.id} subscribed to ${deviceId}`);
+    socket.join(deviceId);
+  });
+
+  socket.on("unsubscribe", (deviceId) => {
+    socket.leave(deviceId);
+  });
 });
 
 // symulacja IoT - co 5 sekund zmienia stan urządzenia
@@ -75,6 +85,18 @@ setInterval(() => {
   devices[0].lastSeen = Date.now();
   devices[0].online = true;
   io.emit("device-update", devices[0]);
+  io.to(devices[0].id).emit("device-update", devices[0]);
 }, 5000);
+
+setInterval(() => {
+  const now = Date.now();
+
+  devices.forEach((device) => {
+    if (now - device.lastSeen > 10000) {
+      device.online = false;
+      io.to(device.id).emit("device-update", device);
+    }
+  });
+}, 3000);
 
 server.listen(4000, () => console.log("Server działa na 4000"));
