@@ -8,58 +8,56 @@ const app = express();
 app.use(express.json());
 app.use(cors({origin: "http://localhost:5173"}));
 
-let settings = {
-  homeTitle: "Witaj w IoT",
-  contactEmail: "info@domowa.pl",
-};
+
 
 let devices = [
   {
-    id: "dev-1",
-    name: "Czujnik 1",
+    id: "fridge",
+    name: "Czujnik temperatury - lodówka",
+    online: true,
+    lastValue: 4.2,
+    lastSeen: Date.now(),
+  },
+  {
+    id: "balcony",
+    name: "Czujnik temperatury - balkon",
+    online: true,
+    lastValue: -1.3,
+    lastSeen: Date.now(),
+  },
+  {
+    id: "room",
+    name: "Czujnik temperatury - pokój",
     online: true,
     lastValue: 21.5,
     lastSeen: Date.now(),
   },
-  {
-    id: "dev-2",
-    name: "Czujnik 2",
-    online: false,
-    lastValue: 0,
-    lastSeen: Date.now() - 600000,
-  },
 ];
 
-app.get("/api/settings", (req, res) => {
-  res.json(settings);
+app.get("/health", (req, res) => {
+  res.json({status: "ok"});
 });
 
-app.put("/api/settings", (req, res) => {
-  const {homeTitle, contactEmail} = req.body || {};
-  if (!homeTitle || homeTitle.length < 3) {
-    return res.status(400).json({message: "homeTitle min 3 znaki"});
-  }
-  if (!contactEmail || !contactEmail.includes("@")) {
-    return res.status(400).json({message: "contactEmail niepoprawny"});
-  }
-  settings = {homeTitle, contactEmail};
-  res.json(settings);
-});
+app.get("/api/home/:homeId/state", (req, res) => {
+  const { homeId } = req.params;
+  res.json({
+    homeId,
+    updatedAt: Date.now(),
+    sensors: {
+      tempFridge: { name: "Lodówka", value: 4.2, unit: "°C", online: true, lastSeen: Date.now() },
+      tempBalcony: { name: "Balkon", value: -1.3, unit: "°C", online: true, lastSeen: Date.now() },
+      temp_room: { name: "Pokój", value: 21.5, unit: "°C", online: true, lastSeen: Date.now() },
+      humidity_room: { name: "Wilgotność", value: 45, unit: "%", online: true, lastSeen: Date.now() },
+      power_total: { name: "Pobór mocy", value: 320, unit: "W", online: true, lastSeen: Date.now() },
+    },
+    security: {
+      door_main: { name: "Drzwi wejściowe", state: "closed", online: true, lastSeen: Date.now() },
+      alarm:{armed:false,triggered:false}
+    },
+    alerts:[]
+  })
+})
 
-app.get("/api/devices", (req, res) => {
-  res.json(devices);
-});
-
-//login
-app.post("/api/auth/login", (req, res) => {
-  const {login, password} = req.body || {};
-  if (login === "admin" && password === "admin123") {
-    return res
-      .status(400)
-      .json({ok: true, user: {login: "admin", role: "admin"}});
-  }
-  return res.status(401).json({message: "Błedny login lub hasło"});
-});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -81,11 +79,22 @@ io.on("connection", (socket) => {
 
 // symulacja IoT - co 5 sekund zmienia stan urządzenia
 setInterval(() => {
-  devices[0].lastValue = Number((20 + Math.random() * 5).toFixed(2));
-  devices[0].lastSeen = Date.now();
-  devices[0].online = true;
-  io.emit("device-update", devices[0]);
-  io.to(devices[0].id).emit("device-update", devices[0]);
+  const idx = Math.floor(Math.random() * devices.length);
+  const d = devices[idx];
+
+  const ranges = {
+    fridge: [2, 8],
+    balcony: [-10, 10],
+    room: [18, 25],
+  };
+
+  const [min, max] = ranges[d.id] || [0, 30];
+  d.lastValue = Number((min + Math.random() * (max - min)).toFixed(1));
+  d.lastSeen = Date.now();
+  d.online = true;
+
+  // io.to(d.id).emit("device-update", d);
+  io.emit("device-update", d);
 }, 5000);
 
 setInterval(() => {
