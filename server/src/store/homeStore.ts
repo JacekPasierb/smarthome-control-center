@@ -91,7 +91,12 @@ function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-export function startSimulator() {
+function updated(onUpdate?: (homeId: string) => void) {
+  homeState.updatedAt = now();
+  onUpdate?.(homeState.homeId);
+}
+
+export function startSimulator(onUpdate?: (homeId: string) => void) {
   setInterval(() => {
     const t = homeState.sensors;
     t.temp_fridge.value = Number(rand(2, 8).toFixed(1));
@@ -109,7 +114,7 @@ export function startSimulator() {
     t.power_total.value = Number(rand(0, 1000).toFixed(1));
     t.power_total.lastSeen = now();
 
-    homeState.updatedAt = now();
+    updated(onUpdate);
   }, 3000);
 }
 
@@ -120,6 +125,7 @@ setInterval(() => {
     door.state = door.state === "open" ? "closed" : "open";
     door.lastSeen = now();
     homeState.updatedAt = now();
+    
   }
 }, 5000);
 
@@ -128,8 +134,7 @@ setInterval(() => {
   const alarm = homeState.security.alarm;
   if (Math.random() < 0.15) {
     alarm.armed = !alarm.armed;
-    if(!alarm.armed) alarm.triggered = false;
+    if (!alarm.armed) alarm.triggered = false;
     homeState.updatedAt = now();
   }
 }, 8000);
-
