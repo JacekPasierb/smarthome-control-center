@@ -2,7 +2,7 @@ import {io} from "socket.io-client";
 import {useEffect, useState} from "react";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
-const WS_URL = import.meta.env.VITE_WS_URL as string || API_URL;
+const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_URL;
 
 interface Sensor {
   name: string;
@@ -35,8 +35,17 @@ interface HomeState {
   alerts: any[];
 }
 
+type Alert = {
+  id: string;
+  type: "TEMP_FRIDGE_HIGH" | "DOOR_OPEN_TOO_LONG";
+  message: string;
+  severity: "info" | "warning" | "critical";
+  createdAt: number;
+};
+
 export default function App() {
   const [home, setHome] = useState<HomeState | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
 
   useEffect(() => {
     fetch(`${API_URL}/api/home/123/state`)
@@ -50,6 +59,10 @@ export default function App() {
     socket.emit("subscribe:home", "123");
     socket.on("home:update", (data: HomeState) => {
       setHome(data);
+      setAlerts(data.alerts ?? []);
+    });
+    socket.on("alert:new", (alert: Alert) => {
+      setAlerts((prev) => [alert, ...prev].slice(0, 20));
     });
     return () => {
       socket.disconnect();
@@ -84,6 +97,32 @@ export default function App() {
         <div>
           {home.security.door_main.state === "open" ? "🚪 Open" : "🔐 Closed"}
         </div>
+      </div>
+      <h2 style={{marginTop: 32}}>Alerts</h2>
+      <div style={{display: "grid", gap: 8}}>
+        {alerts.length === 0 ? (
+          <div style={{opacity: 0.7}}>Brak alertów</div>
+        ) : (
+          alerts.map((a) => (
+            <div
+              key={a.id}
+              style={{border: "1px solid #ddd", borderRadius: 8, padding: 12}}
+            >
+              <div style={{fontWeight: 600}}>
+                {a.severity === "critical"
+                  ? "🚨"
+                  : a.severity === "warning"
+                  ? "⚠️"
+                  : "ℹ️"}{" "}
+                {""}
+                {a.message}
+              </div>
+              <div style={{fontSize: 12, opacity: 0.7}}>
+                {new Date(a.createdAt).toLocaleTimeString()}
+              </div>
+            </div>
+          ))
+        )}
       </div>
       <div
         style={{
