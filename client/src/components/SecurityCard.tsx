@@ -1,19 +1,10 @@
-export type Door = {
-  name: string;
-  state: "open" | "closed";
-  online: boolean;
-  lastSeen: number;
-};
+import type { Alarm, Door } from "../types";
 
-export type Alarm = {
-  armed: boolean;
-  triggered: boolean;
-};
 
 export function SecurityCard({door, alarm}: {door: Door; alarm: Alarm}) {
   return (
     <div style={{display: "grid", gap: 12}}>
-      <div style={{border: "1px solid #ddd", borderRadius: 8, padding: 12}}>
+      <div className="card">
         <div
           style={{display: "flex", justifyContent: "space-between", gap: 12}}
         >
@@ -29,7 +20,7 @@ export function SecurityCard({door, alarm}: {door: Door; alarm: Alarm}) {
           lastSeen: {new Date(door.lastSeen).toLocaleTimeString()}
         </div>
       </div>
-      <div style={{border: "1px solid #ddd", borderRadius: 8, padding: 12}}>
+      <div className="card">
         <div
           style={{display: "flex", justifyContent: "space-between", gap: 12}}
         >

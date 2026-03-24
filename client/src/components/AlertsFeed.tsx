@@ -1,10 +1,5 @@
-export type Alert = {
-  id: string;
-  type: "TEMP_FRIDGE_HIGH" | "DOOR_OPEN_TOO_LONG";
-  message: string;
-  severity: "info" | "warning" | "critical";
-  createdAt: number;
-};
+import type { Alert } from "../types";
+
 
 function icon(severity: Alert["severity"]) {
   if (severity === "critical") return "🚨";
@@ -21,11 +16,7 @@ export function AlertsFeed({alerts}: {alerts: Alert[]}) {
         alerts.map((a) => (
           <div
             key={a.id}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              padding: 10,
-            }}
+            className="card"
           >
             <div style={{fontWeight: 600}}>
               {icon(a.severity)} {a.message}

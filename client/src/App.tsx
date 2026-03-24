@@ -2,10 +2,10 @@ import {io} from "socket.io-client";
 import {useEffect} from "react";
 import {SensorCard} from "./components/SensorCard";
 import {SecurityCard} from "./components/SecurityCard";
-import {AlertsFeed, type Alert} from "./components/AlertsFeed";
+import {AlertsFeed} from "./components/AlertsFeed";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
 import {fetchHomeState} from "./api/homeApi";
-import type {HomeState} from "./types";
+import type {Alert, HomeState} from "./types";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_URL;
@@ -45,21 +45,39 @@ export default function App() {
     return <div style={{padding: 24}}>Error loading data</div>;
 
   return (
-    <div style={{padding: 24, fontFamily: "system-ui"}}>
-      <h1 style={{marginBottom: 8}}>SmartHome Control Center</h1>
-      <h2 style={{marginTop: 24}}>Sensors</h2>
-      <div style={{display: "grid", gap: 12}}>
-        {Object.entries(home.sensors).map(([key, sensor]) => (
-          <SensorCard key={key} sensor={sensor} />
-        ))}
+    <div className="container">
+      <div className="header">
+        <div>
+          <h1 className="h1">SmartHome Control Center</h1>
+          <p className="sub">
+            Realtime IoT Dashboard • WebSocket • React Query
+          </p>
+        </div>
       </div>
-      <h2 style={{marginTop: 32}}>Security</h2>
-      <SecurityCard
-        door={home.security.door_main}
-        alarm={home.security.alarm}
-      />
-      <h2 style={{marginTop: 32}}>Alerts</h2>
-      <AlertsFeed alerts={home.alerts} />
+      <div className="grid">
+        <div className="panel">
+          <h2 className="panelTitle">Sensors</h2>
+          <div className="cardsGrid">
+            {Object.entries(home.sensors).map(([key, sensor]) => (
+              <SensorCard key={key} sensor={sensor} />
+            ))}
+          </div>
+        </div>
+
+        <div style={{display: "grid", gap: 16}}>
+          <div className="panel">
+            <h2 className="panelTitle">Security</h2>
+            <SecurityCard
+              door={home.security.door_main}
+              alarm={home.security.alarm}
+            />
+          </div>
+          <div className="panel">
+            <h2 className="panelTitle">Alerts</h2>
+            <AlertsFeed alerts={home.alerts} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
