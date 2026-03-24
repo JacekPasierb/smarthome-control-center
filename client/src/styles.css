@@ -2,8 +2,14 @@
   --bg: #0b0f17;
   --panel: rgba(255, 255, 255, 0.06);
   --panel-border: rgba(255, 255, 255, 0.12);
+  --card-bg: rgba(255, 255, 255, 0.05);
   --text: rgba(255, 255, 255, 0.92);
   --muted: rgba(255, 255, 255, 0.65);
+
+  --critical: rgba(239, 68, 68, 0.7);
+  --warning: rgba(245, 158, 11, 0.7);
+  --info: rgba(59, 130, 246, 0.7);
+  --success: rgba(22, 163, 74, 0.7);
 }
 
 * {
@@ -33,27 +39,28 @@ a {
 }
 
 .container {
-  max-width: 1080px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 28px 18px;
+  padding: 32px 20px;
 }
 
 .header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
+
+  margin-bottom: 28px;
 }
 
 .h1 {
-  font-size: 28px;
+  font-size: 30px;
   margin: 0;
-  letter-spacing: 0.2px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 .sub {
-  margin: 6px 0 0 0;
+  margin-top: 6px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -61,10 +68,10 @@ a {
 .grid {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;
-  gap: 16px;
+  gap: 20px;
 }
 
-@media (max-width: 920px) {
+@media (max-width: 900px) {
   .grid {
     grid-template-columns: 1fr;
   }
@@ -73,49 +80,94 @@ a {
 .panel {
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  padding: 14px;
-  backdrop-filter: blur(10px);
+  border-radius: 18px;
+  padding: 18px;
+  backdrop-filter: blur(12px);
 }
 
 .panelTitle {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  letter-spacing: 0.4px;
-  color: var(--muted);
+  font-size: 13px;
   text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 14px;
+  color: var(--muted);
 }
 
 .cardsGrid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-@media (max-width: 560px) {
-    .cardsGrid {
-        grid-template-columns: 1fr;
-    }
+@media (max-width: 600px) {
+  .cardsGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
-    padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 14px;
+  transition: all 0.2s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .muted {
-    color: var(--muted);
+  color: var(--muted);
+}
+/* ===================== */
+/* Alerts Styling */
+/* ===================== */
+.alert-critical {
+  border-left: 4px solid var(--critical);
+}
+.alert-warning {
+  border-left: 4px solid var(--warning);
+}
+.alert-info {
+  border-left: 4px solid var(--info);
+}
+.alert-success {
+  border-left: 4px solid var(--success);
 }
 
+/* ===================== */
+/* Alarm banner */
+/* ===================== */
+.alarm-banner {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: var(--critical);
+  padding: 14px 18px;
+  border-radius: 14px;
+  margin-bottom: 20px;
+  animation: pulse 1.2s infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    box-shadow: 0 0 0px rgba(239, 68, 68, 0.4);
+  }
+  to {
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.6);
+  }
+}
+/* ===================== */
+/* Fade in animation */
+/* ===================== */
+
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(6px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
