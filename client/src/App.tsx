@@ -1,50 +1,48 @@
 import {io} from "socket.io-client";
-import {useEffect, useState} from "react";
-import {SensorCard, type Sensor} from "./components/SensorCard";
-import {SecurityCard, type Alarm, type Door} from "./components/SecurityCard";
+import {useEffect} from "react";
+import {SensorCard} from "./components/SensorCard";
+import {SecurityCard} from "./components/SecurityCard";
 import {AlertsFeed, type Alert} from "./components/AlertsFeed";
+import {useQuery, useQueryClient} from "@tanstack/react-query";
+import {fetchHomeState} from "./api/homeApi";
+import type {HomeState} from "./types";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_URL;
 
-interface HomeState {
-  homeId: string;
-  updatedAt: number;
-  sensors: Record<string, Sensor>;
-  security: {
-    door_main: Door;
-    alarm: Alarm;
-  };
-  alerts: Alert[];
-}
-
 export default function App() {
-  const [home, setHome] = useState<HomeState | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-
-  useEffect(() => {
-    fetch(`${API_URL}/api/home/123/state`)
-      .then((res) => res.json())
-      .then((data) => setHome(data))
-      .catch(console.error);
-  }, []);
+  const homeId = "123";
+  const queryClient = useQueryClient();
+  const {
+    data: home,
+    isLoading,
+    isError,
+  } = useQuery<HomeState>({
+    queryKey: ["homeState", homeId],
+    queryFn: () => fetchHomeState(homeId),
+  });
 
   useEffect(() => {
     const socket = io(WS_URL);
-    socket.emit("subscribe:home", "123");
+    socket.emit("subscribe:home", homeId);
+
     socket.on("home:update", (data: HomeState) => {
-      setHome(data);
-      setAlerts(data.alerts ?? []);
+      queryClient.setQueryData<HomeState>(["homeState", homeId], data);
     });
     socket.on("alert:new", (alert: Alert) => {
-      setAlerts((prev) => [alert, ...prev].slice(0, 20));
+      queryClient.setQueryData<HomeState>(["homeState", homeId], (prev) => {
+        if (!prev) return prev;
+        return {...prev, alerts: [alert, ...prev.alerts].slice(0, 20)};
+      });
     });
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [homeId, queryClient]);
 
-  if (!home) return <div style={{padding: 24}}>Loading...</div>;
+  if (isLoading) return <div style={{padding: 24}}>Loading...</div>;
+  if (isError || !home)
+    return <div style={{padding: 24}}>Error loading data</div>;
 
   return (
     <div style={{padding: 24, fontFamily: "system-ui"}}>
@@ -61,7 +59,7 @@ export default function App() {
         alarm={home.security.alarm}
       />
       <h2 style={{marginTop: 32}}>Alerts</h2>
-      <AlertsFeed alerts={alerts} />
+      <AlertsFeed alerts={home.alerts} />
     </div>
   );
 }
