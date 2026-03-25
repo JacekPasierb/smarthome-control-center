@@ -30,7 +30,7 @@ function reducer(state: Point[], action: Action): Point[] {
   const ts = Date.now();
   const next = [...state, {t: ts, time: formatTime(ts), value: action.value}];
   // trzymamy ostatnie 60 punktów
-  return next.slice(-60);
+  return next.filter(p=>ts - p.t <=60_000);
 }
 
 export function LiveChart({title, value}: Props) {
