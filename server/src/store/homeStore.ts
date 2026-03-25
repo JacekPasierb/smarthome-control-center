@@ -149,49 +149,58 @@ export function startSimulator(
 
     updated(onUpdate);
   }, 3000);
-    
-    setInterval(() => {
-        const door = homeState.security.door_main;
-        if (door.state === "open" && doorOpenedAt) {
-            const secondsOpen = (now() - doorOpenedAt) / 1000;
-            if (secondsOpen > 10) {
-                const alert: Alert = {
-                    id: uid(),
-                    type: "DOOR_OPEN_TOO_LONG",
-                    message: `Drzwi są otwarte za długo: ${Math.floor(secondsOpen)}s`,
-                    severity: "critical",
-                    createdAt: now(),
-                };
-                pushAlert(alert);
-                onAlert?.(homeState.homeId, alert);
-                doorOpenedAt = now();
-            }
-        }
-    }, 1000);
-}
 
-// drzwi czasem się otwierają/zamykają
-setInterval(() => {
-  const door = homeState.security.door_main;
-  if (Math.random() < 0.3) {
-    door.state = door.state === "open" ? "closed" : "open";
-    door.lastSeen = now();
-    homeState.updatedAt = now();
-    }
-    
-    if (door.state === "open") {
+  setInterval(() => {
+    const door = homeState.security.door_main;
+    if (door.state === "open" && doorOpenedAt) {
+      const secondsOpen = (now() - doorOpenedAt) / 1000;
+      if (secondsOpen > 10) {
+        const alert: Alert = {
+          id: uid(),
+          type: "DOOR_OPEN_TOO_LONG",
+          message: `Drzwi są otwarte za długo: ${Math.floor(secondsOpen)}s`,
+          severity: "critical",
+          createdAt: now(),
+        };
+        pushAlert(alert);
+        onAlert?.(homeState.homeId, alert);
         doorOpenedAt = now();
-    } else {
-        doorOpenedAt = null;
+      }
     }
-}, 5000);
+  }, 1000);
 
-// alarm czasem uzbrojenie/rozbrojenie
-setInterval(() => {
-  const alarm = homeState.security.alarm;
-  if (Math.random() < 0.15) {
-    alarm.armed = !alarm.armed;
-    if (!alarm.armed) alarm.triggered = false;
+  // drzwi czasem się otwierają/zamykają
+  setInterval(() => {
+    const door = homeState.security.door_main;
+    if (Math.random() < 0.3) {
+      door.state = door.state === "open" ? "closed" : "open";
+      door.lastSeen = now();
+      homeState.updatedAt = now();
+    }
+
+    if (door.state === "open") {
+      doorOpenedAt = now();
+    } else {
+      doorOpenedAt = null;
+    }
+  }, 5000);
+
+  // alarm czasem uzbrojenie/rozbrojenie
+  setInterval(() => {
+    const alarm = homeState.security.alarm;
+    const door = homeState.security.door_main;
+    // losowo uzbrojenie/rozbrojenie alarmu
+    if (Math.random() < 0.35) {
+      alarm.armed = !alarm.armed;
+
+      if (!alarm.armed) alarm.triggered = false;
+    }
+    // jeśli alarm uzbrojony i drzwi open => czasem trigger
+    if (alarm.armed && door.state === "open" && Math.random() < 0.6) {
+      alarm.triggered = true;
+    }
+
     homeState.updatedAt = now();
-  }
-}, 8000);
+    onUpdate?.(homeState.homeId);
+  }, 8000);
+}

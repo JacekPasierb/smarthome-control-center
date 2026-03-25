@@ -54,6 +54,11 @@ export default function App() {
           </p>
         </div>
       </div>
+      {home.security.alarm.triggered && (
+        <div className="alarm-banner">
+         🚨 Alarm triggered! Check door sensors and security status.
+        </div>
+      )}
       <div className="grid">
         <div className="panel">
           <h2 className="panelTitle">Sensors</h2>
