@@ -10,12 +10,15 @@ import {LiveChart} from "./components/LiveChart";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_URL;
-
+const HOME_ID = "123";
 export default function App() {
   const [chartSensorId, setChartSensorId] = useState<
     "temp_fridge" | "temp_balcony" | "temp_room"
   >("temp_room");
-  const homeId = "123";
+  const [wsStatus, setWsStatus] = useState<"connecting" | "online" | "offline">(
+    "connecting"
+  );
+  const homeId = HOME_ID;
   const queryClient = useQueryClient();
   const {
     data: home,
@@ -57,19 +60,49 @@ export default function App() {
   });
 
   useEffect(() => {
-    const socket = io(WS_URL);
-    socket.emit("subscribe:home", homeId);
-
-    socket.on("home:update", (data: HomeState) => {
-      queryClient.setQueryData<HomeState>(["homeState", homeId], data);
+    const socket = io(WS_URL, {
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 700,
     });
-    socket.on("alert:new", (alert: Alert) => {
+    const onConnect = () => {
+      setWsStatus("online");
+      socket.emit("subscribe:home", homeId);
+    }
+    const onDisconnect = () => {
+      setWsStatus("offline");
+    }
+    const onConnectError = () => {
+      setWsStatus("offline");
+    }
+    const onHomeUpdate = (data: HomeState) => {
+      queryClient.setQueryData<HomeState>(["homeState", homeId], data);
+    }
+    const onAlert = (alert: Alert) => {
       queryClient.setQueryData<HomeState>(["homeState", homeId], (prev) => {
         if (!prev) return prev;
         return {...prev, alerts: [alert, ...prev.alerts].slice(0, 20)};
       });
+    }
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
+    socket.on("home:update",onHomeUpdate);
+    socket.on("alert:new", onAlert);
+    
+    socket.on("reconnect_attempt", () => {
+      setWsStatus("connecting");
     });
+
     return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
+      socket.off("home:update", onHomeUpdate);
+      socket.off("alert:new", onAlert);
+     
       socket.disconnect();
     };
   }, [homeId, queryClient]);
@@ -86,6 +119,22 @@ export default function App() {
           <p className="sub">
             Realtime IoT Dashboard • WebSocket • React Query
           </p>
+        </div>
+        <div className="badge">
+          <span
+            className={`dot ${
+              wsStatus === "online"
+                ? "dot-online"
+                : wsStatus === "connecting"
+                ? "dot-connecting"
+                : "dot-offline"
+            }`}
+          />
+          {wsStatus === "online"
+            ? "Realtime: connected"
+            : wsStatus === "connecting"
+            ? "Realtime: connecting..."
+            : "Realtime: disconnected"}
         </div>
       </div>
       {home.security.alarm.triggered && (
