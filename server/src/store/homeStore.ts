@@ -39,68 +39,82 @@ export type Alert = {
 
 const now = () => Date.now();
 
-let homeState: HomeState = {
-  homeId: "123",
-  updatedAt: now(),
-  sensors: {
-    temp_fridge: {
-      name: "Lodówka",
-      value: 4.2,
-      unit: "°C",
-      online: true,
-      lastSeen: now(),
+function createHomeState(homeId: string): HomeState {
+  const ts = now();
+  return {
+    homeId,
+    updatedAt: ts,
+    sensors: {
+      temp_fridge: {
+        name: "Lodówka",
+        value: 4.2,
+        unit: "°C",
+        online: true,
+        lastSeen: ts,
+      },
+      temp_balcony: {
+        name: "Balkon",
+        value: -1.3,
+        unit: "°C",
+        online: true,
+        lastSeen: ts,
+      },
+      temp_room: {
+        name: "Pokój",
+        value: 22.1,
+        unit: "°C",
+        online: true,
+        lastSeen: ts,
+      },
+      humidity_room: {
+        name: "Wilgotność",
+        value: 45.6,
+        unit: "%",
+        online: true,
+        lastSeen: ts,
+      },
+      power_total: {
+        name: "Pobór mocy",
+        value: 320,
+        unit: "W",
+        online: true,
+        lastSeen: ts,
+      },
     },
-    temp_balcony: {
-      name: "Balkon",
-      value: -1.3,
-      unit: "°C",
-      online: true,
-      lastSeen: now(),
+    security: {
+      door_main: {
+        name: "Drzwi wejściowe",
+        state: "closed",
+        online: true,
+        lastSeen: ts,
+      },
+      alarm: {
+        armed: false,
+        triggered: false,
+      },
     },
-    temp_room: {
-      name: "Pokój",
-      value: 21.5,
-      unit: "°C",
-      online: true,
-      lastSeen: now(),
-    },
-    humidity_room: {
-      name: "Wilgotność",
-      value: 45,
-      unit: "%",
-      online: true,
-      lastSeen: now(),
-    },
-    power_total: {
-      name: "Pobór mocy",
-      value: 320,
-      unit: "W",
-      online: true,
-      lastSeen: now(),
-    },
-  },
-  security: {
-    door_main: {
-      name: "Drzwi wejściowe",
-      state: "closed",
-      online: true,
-      lastSeen: now(),
-    },
-    alarm: {armed: false, triggered: false},
-  },
-  alerts: [],
+    alerts: [],
+  };
+}
+
+// 2 domy na start
+const homes: Record<string, HomeState> = {
+  "123": createHomeState("123"),
+  "456": createHomeState("456"),
 };
 
 export const getHomeState = (homeId: string): HomeState => {
-  return homeState;
+  return homes[homeId] ?? homes["123"];
 };
 
 export function setAlarmArmed(homeId: string, armed: boolean) {
-  // MVP: jeden dom
-  homeState.security.alarm.armed = armed;
-  if (!armed) homeState.security.alarm.triggered = false;
-  homeState.updatedAt = now();
-  return homeState;
+  const home = homes[homeId] ?? homes["123"];
+
+  home.security.alarm.armed = armed;
+  if (!armed) home.security.alarm.triggered = false;
+
+  home.updatedAt = now();
+  return home;
 }
 
 function rand(min: number, max: number): number {
@@ -111,104 +125,128 @@ function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-function pushAlert(alert: Alert) {
-  homeState.alerts.unshift(alert);
-  homeState.alerts = homeState.alerts.slice(0, 20);
+function pushAlert(home: HomeState, alert: Alert) {
+  home.alerts.unshift(alert);
+  home.alerts = home.alerts.slice(0, 20);
 }
 
-function updated(onUpdate?: (homeId: string) => void) {
-  homeState.updatedAt = now();
-  onUpdate?.(homeState.homeId);
+function updated(home: HomeState, onUpdate?: (homeId: string) => void) {
+  home.updatedAt = now();
+  onUpdate?.(home.homeId);
 }
-let doorOpenedAt: number | null = null;
+const doorOpenedAt: Record<string, number | null> = {
+  "123": null,
+  "456": null,
+};
 
 export function startSimulator(
   onUpdate?: (homeId: string) => void,
   onAlert?: (homeId: string, alert: Alert) => void
 ) {
   setInterval(() => {
-    const t = homeState.sensors;
-    t.temp_fridge.value = Number(rand(2, 10).toFixed(1));
-    t.temp_fridge.lastSeen = now();
+    Object.values(homes).forEach((home) => {
+      const t = home.sensors;
+      t.temp_fridge.value = Number(rand(2, 10).toFixed(1));
+      t.temp_fridge.lastSeen = now();
 
-    if (homeState.sensors.temp_fridge.value > 8) {
-      const alert: Alert = {
-        id: uid(),
-        type: "TEMP_FRIDGE_HIGH",
-        message: `Lodówka za ciepła: ${homeState.sensors.temp_fridge.value}°C`,
-        severity: "warning",
-        createdAt: now(),
-      };
-      pushAlert(alert);
-      onAlert?.(homeState.homeId, alert);
-    }
+      t.temp_balcony.value = Number(rand(-10, 10).toFixed(1));
+      t.temp_balcony.lastSeen = now();
 
-    t.temp_balcony.value = Number(rand(-10, 10).toFixed(1));
-    t.temp_balcony.lastSeen = now();
+      t.temp_room.value = Number(rand(18, 24).toFixed(1));
+      t.temp_room.lastSeen = now();
 
-    t.temp_room.value = Number(rand(18, 24).toFixed(1));
-    t.temp_room.lastSeen = now();
+      t.humidity_room.value = Number(rand(30, 60).toFixed(1));
+      t.humidity_room.lastSeen = now();
 
-    t.humidity_room.value = Number(rand(30, 60).toFixed(1));
-    t.humidity_room.lastSeen = now();
-
-    t.power_total.value = Number(rand(0, 1000).toFixed(1));
-    t.power_total.lastSeen = now();
-
-    updated(onUpdate);
-  }, 3000);
-
-  setInterval(() => {
-    const door = homeState.security.door_main;
-    if (door.state === "open" && doorOpenedAt) {
-      const secondsOpen = (now() - doorOpenedAt) / 1000;
-      if (secondsOpen > 10) {
+      t.power_total.value = Number(rand(0, 1000).toFixed(1));
+      t.power_total.lastSeen = now();
+      updated(home, onUpdate); // ALERT: lodówka za ciepła
+      if (home.sensors.temp_fridge.value > 8) {
         const alert: Alert = {
           id: uid(),
-          type: "DOOR_OPEN_TOO_LONG",
-          message: `Drzwi są otwarte za długo: ${Math.floor(secondsOpen)}s`,
-          severity: "critical",
+          type: "TEMP_FRIDGE_HIGH",
+          message: `Lodówka za ciepła: ${home.sensors.temp_fridge.value}°C`,
+          severity: "warning",
           createdAt: now(),
         };
-        pushAlert(alert);
-        onAlert?.(homeState.homeId, alert);
-        doorOpenedAt = now();
+
+        pushAlert(home, alert);
+        onAlert?.(home.homeId, alert);
       }
-    }
-  }, 1000);
+    });
+  }, 3000);
 
   // drzwi czasem się otwierają/zamykają
   setInterval(() => {
-    const door = homeState.security.door_main;
-    if (Math.random() < 0.3) {
-      door.state = door.state === "open" ? "closed" : "open";
-      door.lastSeen = now();
-      homeState.updatedAt = now();
-    }
-
-    if (door.state === "open") {
-      doorOpenedAt = now();
-    } else {
-      doorOpenedAt = null;
-    }
+    Object.values(homes).forEach((home) => {
+      const door = home.security.door_main;
+      if (Math.random() < 0.3) {
+        door.state = door.state === "open" ? "closed" : "open";
+        door.lastSeen = now();
+        updated(home, onUpdate);
+        if (door.state === "open") {
+          doorOpenedAt[home.homeId] = now();
+        } else {
+          doorOpenedAt[home.homeId] = null;
+        }
+      }
+    });
   }, 5000);
 
   // alarm czasem uzbrojenie/rozbrojenie
   setInterval(() => {
-    const alarm = homeState.security.alarm;
-    const door = homeState.security.door_main;
-    // losowo uzbrojenie/rozbrojenie alarmu
-    if (Math.random() < 0.35) {
-      alarm.armed = !alarm.armed;
+    Object.values(homes).forEach((home) => {
+      const alarm = home.security.alarm;
+      const door = home.security.door_main;
 
-      if (!alarm.armed) alarm.triggered = false;
-    }
-    // jeśli alarm uzbrojony i drzwi open => czasem trigger
-    if (alarm.armed && door.state === "open" && Math.random() < 0.6) {
-      alarm.triggered = true;
-    }
+      // losowo uzbroj/rozbrój
+      if (Math.random() < 0.35) {
+        alarm.armed = !alarm.armed;
+        if (!alarm.armed) alarm.triggered = false;
+      }
 
-    homeState.updatedAt = now();
-    onUpdate?.(homeState.homeId);
+      // jeśli alarm uzbrojony i drzwi open -> czasem trigger
+      if (alarm.armed && door.state === "open" && Math.random() < 0.6) {
+        alarm.triggered = true;
+      }
+
+      home.updatedAt = now();
+      onUpdate?.(home.homeId);
+    });
   }, 8000);
+
+  setInterval(() => {
+    Object.values(homes).forEach((home) => {
+      const door = home.security.door_main;
+
+      if (door.state === "open") {
+        const openedAt = doorOpenedAt[home.homeId];
+
+        if (!openedAt) {
+          doorOpenedAt[home.homeId] = now();
+          return;
+        }
+
+        const secondsOpen = (now() - openedAt) / 1000;
+
+        if (secondsOpen > 10) {
+          const alert: Alert = {
+            id: uid(),
+            type: "DOOR_OPEN_TOO_LONG",
+            message: `Drzwi otwarte zbyt długo: ${Math.floor(secondsOpen)}s`,
+            severity: "critical",
+            createdAt: now(),
+          };
+
+          pushAlert(home, alert);
+          onAlert?.(home.homeId, alert);
+
+          // reset, żeby nie spamować co sekundę
+          doorOpenedAt[home.homeId] = now();
+        }
+      } else {
+        doorOpenedAt[home.homeId] = null;
+      }
+    });
+  }, 1000);
 }
