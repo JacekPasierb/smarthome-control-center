@@ -1,5 +1,5 @@
 import {io} from "socket.io-client";
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {SensorCard} from "./components/SensorCard";
 import {SecurityCard} from "./components/SecurityCard";
 import {AlertsFeed} from "./components/AlertsFeed";
@@ -11,6 +11,7 @@ import {LiveChart} from "./components/LiveChart";
 const API_URL = import.meta.env.VITE_API_URL as string;
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_URL;
 const HOME_ID = "123";
+
 export default function App() {
   const [chartSensorId, setChartSensorId] = useState<
     "temp_fridge" | "temp_balcony" | "temp_room"
@@ -18,6 +19,9 @@ export default function App() {
   const [wsStatus, setWsStatus] = useState<"connecting" | "online" | "offline">(
     "connecting"
   );
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const prevTriggeredRef = useRef<boolean>(false);
   const homeId = HOME_ID;
   const queryClient = useQueryClient();
   const {
@@ -28,6 +32,24 @@ export default function App() {
     queryKey: ["homeState", homeId],
     queryFn: () => fetchHomeState(homeId),
   });
+
+  useEffect(() => {
+    audioRef.current = new Audio("/alarm.wav");
+    audioRef.current.loop = false;
+    audioRef.current.volume = 0.6;
+  }, []);
+
+  useEffect(() => {
+    if (!home) return;
+    const triggered = home.security.alarm.triggered;
+    const wasTriggered = prevTriggeredRef.current;
+
+    if (soundEnabled && !wasTriggered && triggered) {
+      audioRef.current?.play().catch(() => {});
+    }
+
+    prevTriggeredRef.current = triggered;
+  }, [home, soundEnabled]);
 
   const alarmMutation = useMutation({
     mutationFn: (armed: boolean) => setAlarm(homeId, armed),
@@ -69,29 +91,29 @@ export default function App() {
     const onConnect = () => {
       setWsStatus("online");
       socket.emit("subscribe:home", homeId);
-    }
+    };
     const onDisconnect = () => {
       setWsStatus("offline");
-    }
+    };
     const onConnectError = () => {
       setWsStatus("offline");
-    }
+    };
     const onHomeUpdate = (data: HomeState) => {
       queryClient.setQueryData<HomeState>(["homeState", homeId], data);
-    }
+    };
     const onAlert = (alert: Alert) => {
       queryClient.setQueryData<HomeState>(["homeState", homeId], (prev) => {
         if (!prev) return prev;
         return {...prev, alerts: [alert, ...prev.alerts].slice(0, 20)};
       });
-    }
+    };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onConnectError);
-    socket.on("home:update",onHomeUpdate);
+    socket.on("home:update", onHomeUpdate);
     socket.on("alert:new", onAlert);
-    
+
     socket.on("reconnect_attempt", () => {
       setWsStatus("connecting");
     });
@@ -102,7 +124,7 @@ export default function App() {
       socket.off("connect_error", onConnectError);
       socket.off("home:update", onHomeUpdate);
       socket.off("alert:new", onAlert);
-     
+
       socket.disconnect();
     };
   }, [homeId, queryClient]);
@@ -120,21 +142,38 @@ export default function App() {
             Realtime IoT Dashboard • WebSocket • React Query
           </p>
         </div>
-        <div className="badge">
-          <span
-            className={`dot ${
-              wsStatus === "online"
-                ? "dot-online"
-                : wsStatus === "connecting"
-                ? "dot-connecting"
-                : "dot-offline"
-            }`}
-          />
-          {wsStatus === "online"
-            ? "Realtime: connected"
-            : wsStatus === "connecting"
-            ? "Realtime: connecting..."
-            : "Realtime: disconnected"}
+        <div style={{display: "flex", gap: 10, alignItems: "center"}}>
+          <button
+            className="btn-small"
+            onClick={() => setSoundEnabled((v) => !v)}
+            title="Enable sound alerts"
+          >
+            {soundEnabled ? "🔔 Sound ON" : "🔕 Sound OFF"}
+          </button>
+          <button
+            className="btn-small"
+            onClick={() => audioRef.current?.play()}
+            disabled={!soundEnabled}
+            title="Play test alarm sound"
+          >
+            🔊 Test
+          </button>
+          <div className="badge">
+            <span
+              className={`dot ${
+                wsStatus === "online"
+                  ? "dot-online"
+                  : wsStatus === "connecting"
+                  ? "dot-connecting"
+                  : "dot-offline"
+              }`}
+            />
+            {wsStatus === "online"
+              ? "Realtime: connected"
+              : wsStatus === "connecting"
+              ? "Realtime: connecting..."
+              : "Realtime: disconnected"}
+          </div>
         </div>
       </div>
       {home.security.alarm.triggered && (
