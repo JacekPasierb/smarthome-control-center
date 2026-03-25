@@ -95,6 +95,14 @@ export const getHomeState = (homeId: string): HomeState => {
   return homeState;
 };
 
+export function setAlarmArmed(homeId: string, armed: boolean) {
+  // MVP: jeden dom
+  homeState.security.alarm.armed = armed;
+  if (!armed) homeState.security.alarm.triggered = false;
+  homeState.updatedAt = now();
+  return homeState;
+}
+
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
