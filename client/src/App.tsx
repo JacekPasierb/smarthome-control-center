@@ -1,29 +1,48 @@
-import {io} from "socket.io-client";
 import {useEffect, useRef, useState} from "react";
+import {io} from "socket.io-client";
+import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+
+import {fetchHomeState, setAlarm} from "./api/homeApi";
+import type {Alert, HomeState} from "./types";
+
 import {SensorCard} from "./components/SensorCard";
 import {SecurityCard} from "./components/SecurityCard";
 import {AlertsFeed} from "./components/AlertsFeed";
-import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
-import {fetchHomeState, setAlarm} from "./api/homeApi";
-import type {Alert, HomeState} from "./types";
 import {LiveChart} from "./components/LiveChart";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_URL;
-const HOME_ID = "123";
+
+const HOMES = [
+  {id: "123", label: "Home A (123)"},
+  {id: "456", label: "Home B (456)"},
+] as const;
+
+type HomeId = (typeof HOMES)[number]["id"];
+type WsStatus = "connecting" | "online" | "offline";
+type ChartSensorId = "temp_fridge" | "temp_balcony" | "temp_room";
 
 export default function App() {
-  const [chartSensorId, setChartSensorId] = useState<
-    "temp_fridge" | "temp_balcony" | "temp_room"
-  >("temp_room");
-  const [wsStatus, setWsStatus] = useState<"connecting" | "online" | "offline">(
-    "connecting"
-  );
+  const queryClient = useQueryClient();
+
+  const [homeId, setHomeId] = useState<HomeId>("123");
+  const [chartSensorId, setChartSensorId] =
+    useState<ChartSensorId>("temp_room");
+  const [wsStatus, setWsStatus] = useState<WsStatus>("connecting");
+
+  // audio
   const [soundEnabled, setSoundEnabled] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prevTriggeredRef = useRef<boolean>(false);
-  const homeId = HOME_ID;
-  const queryClient = useQueryClient();
+
+  // socket
+  const socketRef = useRef<ReturnType<typeof io> | null>(null);
+  const currentHomeIdRef = useRef(homeId);
+
+  useEffect(() => {
+    currentHomeIdRef.current = homeId;
+  }, [homeId]);
+
   const {
     data: home,
     isLoading,
@@ -41,6 +60,7 @@ export default function App() {
 
   useEffect(() => {
     if (!home) return;
+
     const triggered = home.security.alarm.triggered;
     const wasTriggered = prevTriggeredRef.current;
 
@@ -88,24 +108,33 @@ export default function App() {
       reconnectionAttempts: Infinity,
       reconnectionDelay: 700,
     });
+    socketRef.current = socket;
+
+    const subscribeCurrent = () => {
+      socket.emit("subscribe:home", currentHomeIdRef.current);
+    };
     const onConnect = () => {
       setWsStatus("online");
-      socket.emit("subscribe:home", homeId);
+      subscribeCurrent();
     };
-    const onDisconnect = () => {
-      setWsStatus("offline");
-    };
-    const onConnectError = () => {
-      setWsStatus("offline");
-    };
+
+    const onDisconnect = () => setWsStatus("offline");
+    const onConnectError = () => setWsStatus("offline");
+
     const onHomeUpdate = (data: HomeState) => {
       queryClient.setQueryData<HomeState>(["homeState", homeId], data);
     };
-    const onAlert = (alert: Alert) => {
-      queryClient.setQueryData<HomeState>(["homeState", homeId], (prev) => {
-        if (!prev) return prev;
-        return {...prev, alerts: [alert, ...prev.alerts].slice(0, 20)};
-      });
+
+    const onAlert = (payload: {homeId: string; alert: Alert}) => {
+      // const activeHomeId = currentHomeIdRef.current;
+
+      queryClient.setQueryData<HomeState>(
+        ["homeState", payload.homeId],
+        (prev) => {
+          if (!prev) return prev;
+          return {...prev, alerts: [payload.alert, ...prev.alerts].slice(0, 20)};
+        }
+      );
     };
 
     socket.on("connect", onConnect);
@@ -114,8 +143,10 @@ export default function App() {
     socket.on("home:update", onHomeUpdate);
     socket.on("alert:new", onAlert);
 
-    socket.on("reconnect_attempt", () => {
-      setWsStatus("connecting");
+    socket.io.on("reconnect_attempt", () => setWsStatus("connecting"));
+    socket.io.on("reconnect", () => {
+      setWsStatus("online");
+      subscribeCurrent();
     });
 
     return () => {
@@ -126,7 +157,17 @@ export default function App() {
       socket.off("alert:new", onAlert);
 
       socket.disconnect();
+      socketRef.current = null;
     };
+  }, [queryClient]);
+
+  useEffect(() => {
+    queryClient.invalidateQueries({queryKey: ["homeState", homeId]});
+
+    const socket = socketRef.current;
+    if (socket?.connected) {
+      socket.emit("subscribe:home", homeId);
+    }
   }, [homeId, queryClient]);
 
   if (isLoading) return <div style={{padding: 24}}>Loading...</div>;
@@ -142,22 +183,21 @@ export default function App() {
             Realtime IoT Dashboard • WebSocket • React Query
           </p>
         </div>
+
         <div style={{display: "flex", gap: 10, alignItems: "center"}}>
-          <button
-            className="btn-small"
-            onClick={() => setSoundEnabled((v) => !v)}
-            title="Enable sound alerts"
+          <select
+            className="select"
+            value={homeId}
+            onChange={(e) => setHomeId(e.target.value as any)}
+            title="Choose home"
           >
-            {soundEnabled ? "🔔 Sound ON" : "🔕 Sound OFF"}
-          </button>
-          <button
-            className="btn-small"
-            onClick={() => audioRef.current?.play()}
-            disabled={!soundEnabled}
-            title="Play test alarm sound"
-          >
-            🔊 Test
-          </button>
+            {HOMES.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.label}
+              </option>
+            ))}
+          </select>
+
           <div className="badge">
             <span
               className={`dot ${
@@ -174,13 +214,30 @@ export default function App() {
               ? "Realtime: connecting..."
               : "Realtime: disconnected"}
           </div>
+          <button
+            className="btn-small"
+            onClick={() => setSoundEnabled((v) => !v)}
+            title="Enable sound alerts"
+          >
+            {soundEnabled ? "🔔 Sound ON" : "🔕 Sound OFF"}
+          </button>
+          <button
+            className="btn-small"
+            onClick={() => audioRef.current?.play()}
+            disabled={!soundEnabled}
+            title="Play test alarm sound"
+          >
+            🔊 Test
+          </button>
         </div>
       </div>
+
       {home.security.alarm.triggered && (
         <div className="alarm-banner">
           🚨 Alarm triggered! Check door sensors and security status.
         </div>
       )}
+
       <div className="grid">
         <div className="panel">
           <h2 className="panelTitle">Sensors</h2>
@@ -221,11 +278,13 @@ export default function App() {
                 Pokój
               </button>
             </div>
+
             <LiveChart
               title={`Temperature • ${home.sensors[chartSensorId].name}`}
               value={home.sensors[chartSensorId].value}
             />
           </div>
+
           <div className="panel">
             <h2 className="panelTitle">Security</h2>
             <div
@@ -261,15 +320,18 @@ export default function App() {
               >
                 🔴 Disarm
               </button>
+
               {alarmMutation.isPending && (
                 <span className="muted">Saving...</span>
               )}
             </div>
+
             <SecurityCard
               door={home.security.door_main}
               alarm={home.security.alarm}
             />
           </div>
+
           <div className="panel">
             <h2 className="panelTitle">Alerts</h2>
             <AlertsFeed alerts={home.alerts} />
