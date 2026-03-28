@@ -39,6 +39,8 @@ export default function App() {
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
   const currentHomeIdRef = useRef(homeId);
 
+  const prevHomeIdRef = useRef<HomeId>(homeId);
+
   useEffect(() => {
     currentHomeIdRef.current = homeId;
   }, [homeId]);
@@ -144,10 +146,7 @@ export default function App() {
     socket.on("alert:new", onAlert);
 
     socket.io.on("reconnect_attempt", () => setWsStatus("connecting"));
-    socket.io.on("reconnect", () => {
-      setWsStatus("online");
-      subscribeCurrent();
-    });
+  
 
     return () => {
       socket.off("connect", onConnect);
@@ -162,12 +161,26 @@ export default function App() {
   }, [queryClient]);
 
   useEffect(() => {
-    queryClient.invalidateQueries({queryKey: ["homeState", homeId]});
-
+    queryClient.invalidateQueries({ queryKey: ["homeState", homeId] });
+    
     const socket = socketRef.current;
-    if (socket?.connected) {
+    if (!socket) {
+      prevHomeIdRef.current = homeId;
+      return;
+    };
+
+    const prevHomeId = prevHomeIdRef.current;
+
+  
+    if (socket.connected && prevHomeId !== homeId) {
+      socket.emit("unsubscribe:home", prevHomeId);
+    }
+
+    if (socket.connected) {
       socket.emit("subscribe:home", homeId);
     }
+
+    prevHomeIdRef.current = homeId;
   }, [homeId, queryClient]);
 
   if (isLoading) return <div style={{padding: 24}}>Loading...</div>;

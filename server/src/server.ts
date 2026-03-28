@@ -18,7 +18,13 @@ io.on("connection", (socket) => {
     socket.join(`home:${homeId}`);
     socket.emit("home:update", getHomeState(homeId));
   });
+
+  socket.on("unsubscribe:home", (homeId: string) => {
+    socket.leave(`home:${homeId}`);
+  });
 });
+
+
 
 startSimulator(
   (homeId) => {
