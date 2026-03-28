@@ -1,4 +1,4 @@
-import {useReducer} from "react";
+import {useEffect, useReducer} from "react";
 import {
   Line,
   LineChart,
@@ -36,15 +36,14 @@ function reducer(state: Point[], action: Action): Point[] {
 export function LiveChart({title, value}: Props) {
   const [data, dispatch] = useReducer(reducer, []);
 
-  // dopisujemy punkt tylko gdy zmienia sie value ( w renderze, ale kontrolowane)
-  // żeby nie dispatchować w każdej  render, porównamy z ostatnimpunktem
-  const last = data[data.length - 1]?.value;
+  useEffect(() => {
+    dispatch({type: "push", value});
+  }, [value]);
+  
   const values = data.map((p) => p.value);
   const min = values.length ? Math.min(...values) : value;
   const max = values.length ? Math.max(...values) : value;
-  if (last !== value) {
-    dispatch({type: "push", value});
-  }
+
 
   return (
     <div className="card">

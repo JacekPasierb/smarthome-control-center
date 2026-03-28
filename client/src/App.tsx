@@ -37,12 +37,7 @@ export default function App() {
 
   // socket
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
-  const currentHomeIdRef = useRef<HomeId>(homeId);
   const prevHomeIdRef = useRef<HomeId>(homeId);
-
-  useEffect(() => {
-    currentHomeIdRef.current = homeId;
-  }, [homeId]);
 
   const {
     data: home,
@@ -111,12 +106,12 @@ export default function App() {
     });
     socketRef.current = socket;
 
-    const subscribeCurrent = () => {
-      socket.emit("subscribe:home", currentHomeIdRef.current);
-    };
+    const subscribe = (id: HomeId) => socket.emit("subscribe:home", id);
+    const unsubscribe = (id: HomeId) => socket.emit("unsubscribe:home", id);
+
     const onConnect = () => {
       setWsStatus("online");
-      subscribeCurrent();
+      subscribe(prevHomeIdRef.current);
     };
 
     const onDisconnect = () => setWsStatus("offline");
@@ -148,7 +143,10 @@ export default function App() {
     socket.on("alert:new", onAlert);
 
     socket.io.on("reconnect_attempt", () => setWsStatus("connecting"));
-
+socket.io.on("reconnect", () => {
+  setWsStatus("online");
+  subscribe(prevHomeIdRef.current);
+});
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
@@ -165,14 +163,11 @@ export default function App() {
     queryClient.invalidateQueries({queryKey: ["homeState", homeId]});
 
     const socket = socketRef.current;
-    if (!socket) {
-      prevHomeIdRef.current = homeId;
-      return;
-    }
-
     const prevHomeId = prevHomeIdRef.current;
+ 
 
-    if (socket.connected) {
+
+    if (socket?.connected) {
       if (prevHomeId !== homeId) {
         socket.emit("unsubscribe:home", prevHomeId);
       }

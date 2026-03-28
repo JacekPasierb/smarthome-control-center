@@ -22,6 +22,10 @@ io.on("connection", (socket) => {
   socket.on("unsubscribe:home", (homeId: string) => {
     socket.leave(`home:${homeId}`);
   });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
+  });
 });
 
 
